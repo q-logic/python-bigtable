@@ -4,6 +4,15 @@
 
 [1]: https://pypi.org/project/google-cloud-bigtable/#history
 
+## [1.3.0](https://www.github.com/googleapis/python-bigtable/compare/v1.2.1...v1.3.0) (2020-01-31)
+
+
+### Features
+
+* **api_core:** support version 3 policy bindings ([#9869](https://www.github.com/googleapis/python-bigtable/issues/9869)) ([a9dee32](https://www.github.com/googleapis/python-bigtable/commit/a9dee327ab39e22a014b3c4126f1c9d1beebe2d1))
+* **bigtable:** add py2 deprecation warnings; standardize use of 'required' in docstrings (via synth) ([#10064](https://www.github.com/googleapis/python-bigtable/issues/10064)) ([5460de0](https://www.github.com/googleapis/python-bigtable/commit/5460de0f7e0d936a23289f679c2b1a3040a21247))
+* **bigtable:** support requested_policy_version for Instance IAM ([#10001](https://www.github.com/googleapis/python-bigtable/issues/10001)) ([7e5d963](https://www.github.com/googleapis/python-bigtable/commit/7e5d963857fd8f7547778d5247b53c24de7a43f6)), closes [#3](https://www.github.com/googleapis/python-bigtable/issues/3)
+
 ## 1.2.1
 
 01-03-2020 10:05 PST
