@@ -22,6 +22,7 @@ from google.api_core.protobuf_helpers import get_messages
 
 from google.cloud.bigtable_admin_v2.proto import bigtable_instance_admin_pb2
 from google.cloud.bigtable_admin_v2.proto import bigtable_table_admin_pb2
+from google.cloud.bigtable_admin_v2.proto import common_pb2
 from google.cloud.bigtable_admin_v2.proto import instance_pb2
 from google.cloud.bigtable_admin_v2.proto import table_pb2
 from google.iam.v1 import iam_policy_pb2
@@ -54,6 +55,7 @@ _shared_modules = [
 _local_modules = [
     bigtable_instance_admin_pb2,
     bigtable_table_admin_pb2,
+    common_pb2,
     instance_pb2,
     table_pb2,
 ]
@@ -65,10 +67,10 @@ for module in _shared_modules:  # pragma: NO COVER
         setattr(sys.modules[__name__], name, message)
         names.append(name)
 for module in _local_modules:
-    for name, message in get_messages(module).items():
-        message.__module__ = "google.cloud.bigtable_admin_v2.types"
-        setattr(sys.modules[__name__], name, message)
-        names.append(name)
+      for name, message in get_messages(module).items():
+          message.__module__ = 'google.cloud.bigtable_admin_v2.types'
+          setattr(sys.modules[__name__], name, message)
+          names.append(name)
 
 
 __all__ = tuple(sorted(names))
