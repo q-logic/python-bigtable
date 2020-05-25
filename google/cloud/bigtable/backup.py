@@ -12,9 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""User friendly container for Cloud Bigtable Backup."""
+
+
+import re
 
 from google.cloud._helpers import _datetime_to_pb_timestamp
 from google.cloud.exceptions import NotFound
+
+_BACKUP_NAME_RE = re.compile(
+    r"^projects/(?P<project>[^/]+)/"
+    r"instances/(?P<instance_id>[a-z][-a-z0-9]*)/"
+    r"clusters/(?P<cluster_id>[a-z][-a-z0-9]*)/"
+    r"backups/(?P<backup_id>[a-z][a-z0-9_\-]*[a-z0-9])$"
+)
 
 
 class Backup(object):
@@ -44,13 +55,10 @@ class Backup(object):
 
 	def __init__(self, backup_id, instance, table=None, expire_time=None):
 		self.backup_id = backup_id
-		self._name = instance.name + "/backups/" + backup_id
 		self._instance = instance
-		self._api = instance._client.table_admin_client
 		self._table = table
 		self._expire_time = expire_time
 		self._create_time = None
-		self._metadata = [("google-cloud-bigtable-backup", self._name)]
 		# self._size_bytes = None
 		# self._state = None
 		# self._referencing_table = None
@@ -66,7 +74,7 @@ class Backup(object):
 		:rtype: str
 		:returns: The backup name.
 		"""
-		return self._name
+		return self._instance.name + "/backups/" + self.backup_id
 
 	@property
 	def table(self):
@@ -101,6 +109,47 @@ class Backup(object):
 		"""
 		return self._create_time
 
+	@classmethod
+	def from_pb(cls, backup_pb, instance):
+		"""Create an instance of this class from a protobuf message.
+
+		:type backup_pb: :class:`~google.bigtable.admin.v2.Backup`
+		:param backup_pb: A backup protobuf object.
+
+		:type instance: :class:`~google.cloud.bigtable.instance.Instance`
+		:param instance: The instance that owns the backup.
+
+		:rtype: :class:`Backup`
+		:returns: The backup parsed from the protobuf response.
+		:raises ValueError:
+		    If the backup name does not match the expected format or the parsed
+		    project ID does not match the project ID on the instance's client,
+		    or if the parsed instance ID does not match the instance's ID.
+		"""
+		match = _BACKUP_NAME_RE.match(backup_pb.name)
+		if match is None:
+			raise ValueError(
+				"Backup protobuf name was not in the expected format.",
+				backup_pb.name
+			)
+		if match.group("project") != instance._client.project:
+			raise ValueError(
+				"Project ID of the backup does not match the project ID "
+				"of the instance's client"
+			)
+
+		instance_id = match.group("instance_id")
+		if instance_id != instance.instance_id:
+			raise ValueError(
+				"Instance ID of the table does not match the instance ID "
+				"of the instance"
+			)
+		backup_id = match.group("backup_id")
+		return cls(backup_id, instance)
+
+	def _metadata(self):
+		return [("google-cloud-bigtable-backup", self.name)]
+
 	def create(self):
 		""" Creates this backup within its instance.
 
@@ -122,7 +171,8 @@ class Backup(object):
 			"expire_time": _datetime_to_pb_timestamp(self.expire_time),
 		}
 
-		future = self._api.create_backup(
+		api = self._instance._client.table_admin_client
+		future = api.create_backup(
 			self._instance.name,
 			self.backup_id,
 			backup,
@@ -137,7 +187,8 @@ class Backup(object):
 		:returns: True if the backup exists, else False.
 		"""
 		try:
-			self._api.get_backup(self._name, metadata=self._metadata)
+			api = self._instance._client.table_admin_client
+			api.get_backup(self.name, metadata=self._metadata)
 		except NotFound:
 			return False
 		return True
@@ -149,7 +200,8 @@ class Backup(object):
 				 :class:`~google.cloud.bigtable_admin_v2.types.Backup`
 		"""
 		try:
-			backup = self._api.get_backup(self._name, metadata=self._metadata)
+			api = self._instance._client.table_admin_client
+			backup = api.get_backup(self.name, metadata=self._metadata)
 		except NotFound:
 			return None
 		return backup
@@ -161,11 +213,12 @@ class Backup(object):
 		:param new_expire_time: the new expire time timestamp
 		"""
 		backup_update = {
-			"name": self._name,
+			"name": self.name,
 			"expire_time": _datetime_to_pb_timestamp(new_expire_time),
 		}
 		update_mask = {"paths": ["expire_time"]}
-		self._api.update_backup(
+		api = self._instance._client.table_admin_client
+		api.update_backup(
 			backup_update, update_mask, metadata=self._metadata
 		)
 		self._expire_time = new_expire_time
@@ -176,7 +229,8 @@ class Backup(object):
 
 	def delete(self):
 		"""Delete this backup."""
-		self._api.delete_backup(self._name, metadata=self._metadata)
+		api = self._instance._client.table_admin_client
+		api.delete_backup(self.name, metadata=self._metadata)
 
 	def restore(self, table_id):
 		""" Creates a new table by restoring from this backup. The new table
@@ -192,7 +246,8 @@ class Backup(object):
 		:return: An instance of
 		 	:class:`~google.cloud.bigtable_admin_v2.types._OperationFuture`.
 		"""
-		future = self._api.create_backup(
+		api = self._instance._client.table_admin_client
+		future = api.create_backup(
 			self._instance.name,
 			table_id,
 			self.backup_id,
