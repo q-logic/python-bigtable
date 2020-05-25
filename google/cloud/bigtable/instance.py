@@ -14,7 +14,8 @@
 
 """User-friendly container for Google Cloud Bigtable Instance."""
 
-
+import google.api_core.operation as operation
+import google.cloud.bigtable.backup as backup
 import re
 
 from google.cloud.bigtable.table import Table
@@ -22,6 +23,7 @@ from google.cloud.bigtable.cluster import Cluster
 from google.cloud.bigtable.app_profile import AppProfile
 
 from google.protobuf import field_mask_pb2
+from google.protobuf.empty_pb2 import Empty
 
 from google.cloud.bigtable_admin_v2.types import instance_pb2, options_pb2
 
@@ -643,6 +645,112 @@ class Instance(object):
             result.append(self.table(table_id))
 
         return result
+
+    def backup(self, backup_id, table=None, expire_time=None):
+        """ Factory to create a Backup within this Instance.
+
+        :type backup_id: str
+        :param backup_id: The ID of the Backup to be created.
+
+        :type table: :class:`~google.cloud.bigtable.table.Table`
+        :param table: (Optional) The Table create the Backup from.
+            Required, if the `create` method needs to be called.
+
+        :type expire_time: :class:`datetime.datetime`
+        :param expire_time: (Optional) The expiration time of this new Backup.
+            Required, if the `create` method needs to be called.
+        """
+        try:
+            return backup.Backup(
+                backup_id, self, table=table.name, expire_time=expire_time
+            )
+        except AttributeError:
+            return backup.Backup(
+                backup_id, self, table=table, expire_time=expire_time
+            )
+
+    def list_backups(self, filter_=None, page_size=None):
+        """ List Backups for the Instance.
+
+        :type filter_: str
+        :param filter_: (Optional) A string specifying a filter to apply to
+            the list of Backups received from the back-end.
+
+        :type page_size: int
+        :param page_size: (Optional) The maximum number of Backus in each page
+            of the results from this request. Non-positive values are ignored.
+            Defaults to a sensible value set by the API.
+
+        :rtype: :class:`~google.api_core.page_iterator.Iterator`
+        :returns: Iterator of :class:`~google.cloud.bigtable.backup.Backup`
+            resources within the current Instance.
+        """
+        page_iter = self._client.table_admin_client.list_backups(
+            self.name, filter_, page_size=page_size
+        )
+        page_iter.item_to_value = self._item_to_backup
+        return page_iter
+
+    def _item_to_backup(self, iterator, backup_pb):
+        """ Convert a Backup protobuf to the native object.
+
+        :type iterator: :class:`~google.api_core.page_iterator.Iterator`
+        :param iterator: The iterator that is currently in use.
+
+		:type backup_pb: :class:`table_pb2.Backup`
+        :param backup_pb: A backup returned from the API.
+
+		:rtype: :class:`~google.cloud.bigtable.backup.Backup`
+        :returns: The next backup in the page.
+        """
+        return backup.Backup.from_pb(backup_pb, self)
+
+    def list_backup_operations(self, filter_=None, page_size=None):
+        """ List backup operations for this Instance.
+
+        :type filter_: str
+        :param filter_: (Optional) A string specifying a filter for which
+            the backup operations are to be listed.
+
+        :type page_size: int
+        :param page_size: (Optional) The maximum number of operations in each
+            page of the results received from this request. Non-positive values
+            are ignored. Defaults to a sensible value set by the API.
+
+        :rtype: :class:`~google.api_core.page_iterator.Iterator`
+        :returns: Iterator of :class:`~google.api_core.operation.Operation`
+            resources within the current Instance.
+        """
+        page_iter = self._client.table_admin_client.list_backup_operations(
+            self.name, filter_, page_size=page_size
+        )
+        page_iter.item_to_value = self._item_to_operation
+        return page_iter
+
+    def _item_to_operation(self, iterator, operation_pb):
+        """ Convert an Operation protobuf to the native object.
+
+        :type iterator: :class:`~google.api_core.page_iterator.Iterator`
+        :param iterator: The iterator that is currently in use.
+
+        :type operation_pb: :class:`~google.longrunning.operations.Operation`
+        :param operation_pb: An operation returned from the API.
+
+        :rtype: :class:`~google.api_core.operation.Operation`
+        :returns: The next operation in the page.
+        """
+        api_transport = self._client.table_admin_client.transport
+        operations_client = api_transport._operations_client
+        metadata_type = backup._OPERATION_METADATA_TYPES.get(
+            operation_pb.metadata.type_url, Empty
+        )
+        response_type = backup._OPERATION_RESPONSE_TYPES[metadata_type]
+        return operation.from_gapic(
+            operation_pb,
+            operations_client,
+            response_type,
+            metadata_type=metadata_type
+        )
 
     def app_profile(
         self,
