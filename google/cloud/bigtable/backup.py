@@ -59,10 +59,10 @@ class Backup(object):
 		self._instance = instance
 		self._table = table
 		self._expire_time = expire_time
-		self._create_time = None
-		# self._size_bytes = None
-		# self._state = None
-		# self._referencing_table = None
+		self._start_time = None
+		self._end_time = None
+		self._size_bytes = None
+		self._state = None
 
 	@property
 	def name(self):
@@ -79,11 +79,11 @@ class Backup(object):
 
 	@property
 	def table(self):
-		""" The name of the Table used in requests.
+		""" The name of the Table from which this Backup is created.
 
 		The table name is of the form
 
-			``"projects/../instances/../backups/{backup_id}"``
+			``"projects/../instances/../tables/{source_table}"``
 
 		:rtype: str
 		:returns: The Table name.
@@ -92,7 +92,7 @@ class Backup(object):
 
 	@property
 	def expire_time(self):
-		"""Expire time used in creation requests.
+		""" Expiration time used in the creation requests.
 
 		:rtype: :class:`datetime.datetime`
 		:returns: A 'datetime' object representing the expiration time of
@@ -101,14 +101,42 @@ class Backup(object):
 		return self._expire_time
 
 	@property
-	def create_time(self):
-		"""Create time of this Backup.
+	def start_time(self):
+		""" The time this Backup was started.
 
 		:rtype: :class:`datetime.datetime`
-		:returns: A 'datetime' object representing the time when this Backup
-				  was created.
+		:returns: A 'datetime' object representing the time when the creation
+				  of this Backup was created.
 		"""
-		return self._create_time
+		return self._start_time
+
+	@property
+	def end_time(self):
+		""" The time this Backup was finished.
+
+		:rtype: :class:`datetime.datetime`
+		:returns: A 'datetime' object representing the time when the creation
+				  of this Backup was finished.
+		"""
+		return self._end_time
+
+	@property
+	def size_bytes(self):
+		""" The size of this Backup, in bytes.
+
+		:rtype: int
+		:returns: The size of this Backup, in bytes.
+		"""
+		return self._size_bytes
+
+	@property
+	def state(self):
+		""" The current state of this Backup.
+
+		:rtype: :class:`~google.cloud.bigtable_admin_v2.gapic.enums.Backup.State`
+		:returns: The current state of this Backup.
+		"""
+		return self._state
 
 	@classmethod
 	def from_pb(cls, backup_pb, instance):

@@ -22,10 +22,13 @@ from google.cloud._helpers import UTC
 
 
 class TestBackup(unittest.TestCase):
-	BACKUP_ID = 'backup-id'
+	PROJECT_ID = 'project-id'
 	INSTANCE_ID = 'instance-id'
 	INSTANCE_NAME = 'projects/instances/' + INSTANCE_ID
 	TABLE_ID = 'table-id'
+	TABLE_NAME = INSTANCE_NAME + '/tables/' + TABLE_ID
+	BACKUP_ID = 'backup-id'
+	BACKUP_NAME = INSTANCE_NAME + "/backups/" + BACKUP_ID
 
 	@staticmethod
 	def _get_target_class():
@@ -35,6 +38,9 @@ class TestBackup(unittest.TestCase):
 
 	def _make_one(self, *args, **kwargs):
 		return self._get_target_class()(*args, **kwargs)
+
+	def _make_timestamp(self):
+		return datetime.datetime.utcnow().replace(tzinfo=UTC)
 
 	def test_constructor_defaults(self):
 		instance = _Instance(self.INSTANCE_NAME)
@@ -48,7 +54,7 @@ class TestBackup(unittest.TestCase):
 
 	def test_constructor_non_defaults(self):
 		instance = _Instance(self.INSTANCE_NAME)
-		expire_time = datetime.datetime.utcnow().replace(tzinfo=UTC)
+		expire_time = self._make_timestamp()
 
 		backup = self._make_one(
 			self.BACKUP_ID,
@@ -64,34 +70,100 @@ class TestBackup(unittest.TestCase):
 		self.assertIsNone(backup._create_time)
 
 	def test_from_pb_project_mismatch(self):
-		pass
+		from google.cloud.bigtable_admin_v2.proto import table_pb2
+
+		alt_project_id = 'alt-project-id'
+		client = _Client(project=alt_project_id)
+		instance = _Instance(self.INSTANCE_NAME, client)
+		backup_pb = table_pb2.Backup(name=self.BACKUP_NAME)
+		klasse = self._get_target_class()
+
+		with self.assertRaises(ValueError):
+			klasse.from_pb(backup_pb, instance)
 
 	def test_from_pb_instance_mismatch(self):
-		pass
+		from google.cloud.bigtable_admin_v2.proto import table_pb2
+
+		alt_instance = "/projects/%s/instances/alt-instance" % self.PROJECT_ID
+		client = _Client()
+		instance = _Instance(alt_instance, client)
+		backup_pb = table_pb2.Backup(name=self.BACKUP_NAME)
+		klasse = self._get_target_class()
+
+		with self.assertRaises(ValueError):
+			klasse.from_pb(backup_pb, instance)
 
 	def test_from_pb_bad_name(self):
-		pass
+		from google.cloud.bigtable_admin_v2.proto import table_pb2
+
+		client = _Client()
+		instance = _Instance(self.INSTANCE_NAME, client)
+		backup_pb = table_pb2.Backup(name="invalid_name")
+		klasse = self._get_target_class()
+
+		with self.assertRaises(ValueError):
+			klasse.from_pb(backup_pb, instance)
 
 	def test_from_pb_success(self):
-		pass
+		from google.cloud.bigtable_admin_v2.proto import table_pb2
+
+		client = _Client()
+		instance = _Instance(self.INSTANCE_NAME, client)
+		backup_pb = table_pb2.Backup(name=self.BACKUP_NAME)
+		klasse = self._get_target_class()
+
+		backup = klasse.from_pb(backup_pb, instance)
+
+		self.assertTrue(isinstance(backup, klasse))
+		self.assertEqual(backup._instance, instance)
+		self.assertEqual(backup.backup_id, self.BACKUP_ID)
+		self.assertEqual(backup._table, "")
+		self.assertIsNone(backup._expire_time)
+		self.assertIsNone(backup._create_time)
 
 	def test_property_name(self):
-		pass
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected_name = self.BACKUP_NAME
+		self.assertEqual(backup.name, expected_name)
 
 	def test_property_table(self):
-		pass
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected = backup._table = self.TABLE_NAME
+		self.assertEqual(backup.table, expected)
 
 	def test_property_expire_time(self):
-		pass
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected = backup._expire_time = self._make_timestamp()
+		self.assertEqual(backup.expire_time, expected)
 
-	def test_property_create_time(self):
-		pass
+	def test_property_start_time(self):
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected = backup._start_time = self._make_timestamp()
+		self.assertEqual(backup.start_time, expected)
+
+	def test_property_end_time(self):
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected = backup._end_time = self._make_timestamp()
+		self.assertEqual(backup.end_time, expected)
 
 	def test_property_size(self):
-		pass
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected = backup._size_bytes = 10
+		self.assertEqual(backup.size_bytes, expected)
 
 	def test_property_state(self):
-		pass
+		from google.cloud.bigtable_admin_v2.gapic import enums
+
+		instance = _Instance(self.INSTANCE_NAME)
+		backup = self._make_one(self.BACKUP_ID, instance)
+		expected = backup._state = enums.Backup.State.READY
+		self.assertEqual(backup.state, expected)
 
 	def test_create_grpc_error(self):
 		pass
@@ -141,6 +213,11 @@ class TestBackup(unittest.TestCase):
 	def test_is_ready(self):
 		pass
 
+
+class _Client(object):
+	def __init__(self, project=TestBackup.PROJECT_ID):
+		self.project = project
+		self.project_name = "projects/" + self.project
 
 
 class _Instance(object):
