@@ -669,88 +669,30 @@ class Instance(object):
                 backup_id, self, table=table, expire_time=expire_time
             )
 
-    def list_backups(self, filter_=None, page_size=None):
+    def list_backups(self):
         """ List Backups for the Instance.
-
-        :type filter_: str
-        :param filter_: (Optional) A string specifying a filter to apply to
-            the list of Backups received from the back-end.
-
-        :type page_size: int
-        :param page_size: (Optional) The maximum number of Backus in each page
-            of the results from this request. Non-positive values are ignored.
-            Defaults to a sensible value set by the API.
 
         :rtype: :class:`~google.api_core.page_iterator.Iterator`
         :returns: Iterator of :class:`~google.cloud.bigtable.backup.Backup`
             resources within the current Instance.
+        :raises: :class:`ValueError <exceptions.ValueError>` if one of the
+                 returned Backups' name is not of the expected format.
         """
-        page_iter = self._client.table_admin_client.list_backups(
-            self.name, filter_, page_size=page_size
+        backup_list_pb = self._client.table_admin_client.list_backups(
+            self.name
         )
-        page_iter.item_to_value = self._item_to_backup
-        return page_iter
 
-    def _item_to_backup(self, iterator, backup_pb):
-        """ Convert a Backup protobuf to the native object.
+        result = []
+        for backup_pb in backup_list_pb:
+            backup_prefix = self.name + '/backups/'
+            if not backup_pb.name.startswith(backup_prefix):
+                raise ValueError(
+                    "Backup name {} not of expected format".format(backup_pb.name)
+                )
+            backup_id = backup_pb.name[len(backup_prefix) :]
+            result.append(self.backup(backup_id))
 
-        :type iterator: :class:`~google.api_core.page_iterator.Iterator`
-        :param iterator: The iterator that is currently in use.
-
-		:type backup_pb: :class:`table_pb2.Backup`
-        :param backup_pb: A backup returned from the API.
-
-		:rtype: :class:`~google.cloud.bigtable.backup.Backup`
-        :returns: The next backup in the page.
-        """
-        return backup.Backup.from_pb(backup_pb, self)
-
-    def list_backup_operations(self, filter_=None, page_size=None):
-        """ List backup operations for this Instance.
-
-        :type filter_: str
-        :param filter_: (Optional) A string specifying a filter for which
-            the backup operations are to be listed.
-
-        :type page_size: int
-        :param page_size: (Optional) The maximum number of operations in each
-            page of the results received from this request. Non-positive values
-            are ignored. Defaults to a sensible value set by the API.
-
-        :rtype: :class:`~google.api_core.page_iterator.Iterator`
-        :returns: Iterator of :class:`~google.api_core.operation.Operation`
-            resources within the current Instance.
-        """
-        page_iter = self._client.table_admin_client.list_backup_operations(
-            self.name, filter_, page_size=page_size
-        )
-        page_iter.item_to_value = self._item_to_operation
-        return page_iter
-
-    def _item_to_operation(self, iterator, operation_pb):
-        """ Convert an Operation protobuf to the native object.
-
-        :type iterator: :class:`~google.api_core.page_iterator.Iterator`
-        :param iterator: The iterator that is currently in use.
-
-        :type operation_pb: :class:`~google.longrunning.operations.Operation`
-        :param operation_pb: An operation returned from the API.
-
-        :rtype: :class:`~google.api_core.operation.Operation`
-        :returns: The next operation in the page.
-        """
-        api_transport = self._client.table_admin_client.transport
-        operations_client = api_transport._operations_client
-        metadata_type = backup._OPERATION_METADATA_TYPES.get(
-            operation_pb.metadata.type_url, Empty
-        )
-        response_type = backup._OPERATION_RESPONSE_TYPES[metadata_type]
-        return operation.from_gapic(
-            operation_pb,
-            operations_client,
-            response_type,
-            metadata_type=metadata_type
-        )
+        return result
 
     def app_profile(
         self,

@@ -14,10 +14,11 @@
 
 """User friendly container for Cloud Bigtable Backup."""
 
-
 import re
 
 from google.cloud._helpers import _datetime_to_pb_timestamp
+from google.cloud.bigtable_admin_v2.proto import table_pb2
+from google.cloud.bigtable_admin_v2.proto import bigtable_table_admin_pb2
 from google.cloud.exceptions import NotFound
 
 _BACKUP_NAME_RE = re.compile(
@@ -111,15 +112,15 @@ class Backup(object):
 
 	@classmethod
 	def from_pb(cls, backup_pb, instance):
-		"""Create an instance of this class from a protobuf message.
+		""" Creates a Backup instance from a protobuf message.
 
-		:type backup_pb: :class:`~google.bigtable.admin.v2.Backup`
+		:type backup_pb: :class:`table_pb2.Backup`
 		:param backup_pb: A backup protobuf object.
 
-		:type instance: :class:`~google.cloud.bigtable.instance.Instance`
-		:param instance: The instance that owns the backup.
+		:type instance: :class:`Instance <google.cloud.bigtable.instance.Instance>`
+		:param instance: The Instance that owns the backup.
 
-		:rtype: :class:`Backup`
+		:rtype: :class:`~google.cloud.bigtable.backup.Backup`
 		:returns: The backup parsed from the protobuf response.
 		:raises ValueError:
 		    If the backup name does not match the expected format or the parsed
@@ -141,7 +142,7 @@ class Backup(object):
 		instance_id = match.group("instance_id")
 		if instance_id != instance.instance_id:
 			raise ValueError(
-				"Instance ID of the table does not match the instance ID "
+				"Instance ID of the backup does not match the instance ID "
 				"of the instance"
 			)
 		backup_id = match.group("backup_id")
@@ -156,10 +157,10 @@ class Backup(object):
 		:rtype: :class:`~google.api_core.operation.Operation`
 		:returns: :class:`~google.cloud.bigtable_admin_v2.types._OperationFuture`
 				  instance, to be used to poll the status of the 'create' request
-		:raises Conflict: if the backup already exists
-		:raises NotFound: if the instance owning the backup does not exist
-		:raises BadRequest: if the table or expire_time values are invalid
-							or expire_time is not set
+		:raises Conflict: if the Backup already exists
+		:raises NotFound: if the Instance owning the Backup does not exist
+		:raises BadRequest: if the `table` or `expire_time` values are invalid,
+							or `expire_time` is not set
 		"""
 		if not self._expire_time:
 			raise ValueError("expire_time not set")
@@ -181,10 +182,10 @@ class Backup(object):
 		return future
 
 	def exists(self):
-		"""Test whether this backup exists.
+		""" Tests whether this Backup exists.
 
 		:rtype: bool
-		:returns: True if the backup exists, else False.
+		:returns: True if the Backup exists, else False.
 		"""
 		try:
 			api = self._instance._client.table_admin_client
@@ -194,7 +195,7 @@ class Backup(object):
 		return True
 
 	def get(self):
-		""" Gets metadata on a pending or completed Cloud Bigtable Backup.
+		""" Retrieves metadata of a pending or completed Backup.
 
 		:return: An instance of
 				 :class:`~google.cloud.bigtable_admin_v2.types.Backup`
@@ -207,10 +208,10 @@ class Backup(object):
 		return backup
 
 	def update_expire_time(self, new_expire_time):
-		"""Update the expire time of this backup.
+		"""Update the expire time of this Backup.
 
 		:type new_expire_time: :class:`datetime.datetime`
-		:param new_expire_time: the new expire time timestamp
+		:param new_expire_time: the new expiration time timestamp
 		"""
 		backup_update = {
 			"name": self.name,
@@ -233,16 +234,16 @@ class Backup(object):
 		api.delete_backup(self.name, metadata=self._metadata)
 
 	def restore(self, table_id):
-		""" Creates a new table by restoring from this backup. The new table
-        must be in the same instance as the instance containing the backup. The
-        returned table ``long-running operation`` can be used to track the
-        progress of the operation, and to cancel it. The ``response`` type is
+		""" Creates a new Table by restoring from this Backup. The new Table
+        must be in the same Instance as the Instance containing the Backup.
+        The returned Table ``long-running operation`` can be used to track the
+        progress of the operation and to cancel it. The ``response`` type is
         ``Table``, if successful.
 
-        TODO: Consider overwriting the existing table, if necessary.
+        TODO: Consider overwriting the existing Table, if necessary.
 
-		:param table_id: The ID of the table to create and restore to.
-			This table must not already exist.
+		:param table_id: The ID of the Table to create and restore to.
+			This Table must not already exist.
 		:return: An instance of
 		 	:class:`~google.cloud.bigtable_admin_v2.types._OperationFuture`.
 		"""
