@@ -49,8 +49,8 @@ class Backup(object):
 				  Required if the 'create' method needs to be called.
 
 	:type expire_time: :class:`datetime.datetime`
-	:param expire_time: (Optional) The expire time that will be used to
-	                    create the Backup. Required if the create method
+	:param expire_time: (Optional) The expiration time that will be used to
+	                    create the Backup. Required if the `create` method
 	                    needs to be called.
 	"""
 
@@ -68,12 +68,12 @@ class Backup(object):
 	def name(self):
 		"""Backup name used in requests.
 
-		The backup name is of the form
+		The Backup name is of the form
 
 			``"projects/../instances/../backups/{backup_id}"``
 
 		:rtype: str
-		:returns: The backup name.
+		:returns: The Backup name.
 		"""
 		return self._instance.name + "/backups/" + self.backup_id
 
@@ -86,7 +86,7 @@ class Backup(object):
 			``"projects/../instances/../backups/{backup_id}"``
 
 		:rtype: str
-		:returns: The table name.
+		:returns: The Table name.
 		"""
 		return self._table
 
@@ -96,16 +96,16 @@ class Backup(object):
 
 		:rtype: :class:`datetime.datetime`
 		:returns: A 'datetime' object representing the expiration time of
-				  this backup.
+				  this Backup.
 		"""
 		return self._expire_time
 
 	@property
 	def create_time(self):
-		"""Create time of this backup.
+		"""Create time of this Backup.
 
 		:rtype: :class:`datetime.datetime`
-		:returns: A 'datetime' object representing the time when this backup
+		:returns: A 'datetime' object representing the time when this Backup
 				  was created.
 		"""
 		return self._create_time
@@ -115,10 +115,10 @@ class Backup(object):
 		""" Creates a Backup instance from a protobuf message.
 
 		:type backup_pb: :class:`table_pb2.Backup`
-		:param backup_pb: A backup protobuf object.
+		:param backup_pb: A Backup protobuf object.
 
 		:type instance: :class:`Instance <google.cloud.bigtable.instance.Instance>`
-		:param instance: The Instance that owns the backup.
+		:param instance: The Instance that owns the Backup.
 
 		:rtype: :class:`~google.cloud.bigtable.backup.Backup`
 		:returns: The backup parsed from the protobuf response.
@@ -135,14 +135,14 @@ class Backup(object):
 			)
 		if match.group("project") != instance._client.project:
 			raise ValueError(
-				"Project ID of the backup does not match the project ID "
+				"Project ID of the Backup does not match the Project ID "
 				"of the instance's client"
 			)
 
 		instance_id = match.group("instance_id")
 		if instance_id != instance.instance_id:
 			raise ValueError(
-				"Instance ID of the backup does not match the instance ID "
+				"Instance ID of the Backup does not match the Instance ID "
 				"of the instance"
 			)
 		backup_id = match.group("backup_id")
@@ -243,7 +243,7 @@ class Backup(object):
         TODO: Consider overwriting the existing Table, if necessary.
 
 		:param table_id: The ID of the Table to create and restore to.
-			This Table must not already exist.
+						 This Table must not already exist.
 		:return: An instance of
 		 	:class:`~google.cloud.bigtable_admin_v2.types._OperationFuture`.
 		"""
