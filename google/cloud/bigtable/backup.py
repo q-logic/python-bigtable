@@ -17,8 +17,9 @@
 import re
 
 from google.cloud._helpers import _datetime_to_pb_timestamp
-from google.cloud.bigtable_admin_v2.proto import table_pb2
-from google.cloud.bigtable_admin_v2.proto import bigtable_table_admin_pb2
+from google.cloud.bigtable_admin_v2.gapic import enums
+# from google.cloud.bigtable_admin_v2.proto import table_pb2
+# from google.cloud.bigtable_admin_v2.proto import bigtable_table_admin_pb2
 from google.cloud.exceptions import NotFound
 
 _BACKUP_NAME_RE = re.compile(
@@ -255,6 +256,14 @@ class Backup(object):
 	def update(self):
 		# TODO: Determine whether this wrapper is necessary
 		raise NotImplementedError
+
+	def is_ready(self):
+		""" Tests whether this Backup is ready for use.
+
+		:rtype: bool
+		:returns: True if the Backup state is READY, otherwise False.
+		"""
+		return self._state == enums
 
 	def delete(self):
 		"""Delete this backup."""
