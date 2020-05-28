@@ -24,11 +24,13 @@ from google.cloud._helpers import UTC
 class TestBackup(unittest.TestCase):
 	PROJECT_ID = 'project-id'
 	INSTANCE_ID = 'instance-id'
-	INSTANCE_NAME = 'projects/instances/' + INSTANCE_ID
+	INSTANCE_NAME = 'projects/' + PROJECT_ID + '/instances/' + INSTANCE_ID
+	CLUSTER_ID = 'cluster-id'
+	CLUSTER_NAME = INSTANCE_NAME + '/clusters/' + CLUSTER_ID
 	TABLE_ID = 'table-id'
 	TABLE_NAME = INSTANCE_NAME + '/tables/' + TABLE_ID
 	BACKUP_ID = 'backup-id'
-	BACKUP_NAME = INSTANCE_NAME + "/backups/" + BACKUP_ID
+	BACKUP_NAME = CLUSTER_NAME + '/backups/' + BACKUP_ID
 
 	@staticmethod
 	def _get_target_class():
@@ -37,7 +39,7 @@ class TestBackup(unittest.TestCase):
 		return Backup
 
 	@staticmethod
-	def _make_table_admin_api():
+	def _make_table_admin_client():
 		from google.cloud.bigtable_admin_v2 import BigtableTableAdminClient
 
 		return mock.create_autospec(BigtableTableAdminClient, instance=True)
@@ -54,7 +56,8 @@ class TestBackup(unittest.TestCase):
 
 		self.assertEqual(backup.backup_id, self.BACKUP_ID)
 		self.assertIs(backup._instance, instance)
-		self.assertIsNone(backup._table)
+		self.assertIsNone(backup._cluster)
+		self.assertIsNone(backup._source_table)
 		self.assertIsNone(backup._expire_time)
 		self.assertIsNone(backup._start_time)
 		self.assertIsNone(backup._end_time)
@@ -68,13 +71,15 @@ class TestBackup(unittest.TestCase):
 		backup = self._make_one(
 			self.BACKUP_ID,
 			instance,
-			table=self.TABLE_ID,
+			cluster=self.CLUSTER_ID,
+			source_table=self.TABLE_ID,
 			expire_time=expire_time
 		)
 
 		self.assertEqual(backup.backup_id, self.BACKUP_ID)
 		self.assertIs(backup._instance, instance)
-		self.assertEqual(backup._table, self.TABLE_ID)
+		self.assertIs(backup._cluster, self.CLUSTER_ID)
+		self.assertEqual(backup._source_table, self.TABLE_ID)
 		self.assertEqual(backup._expire_time, expire_time)
 		self.assertIsNone(backup._start_time)
 		self.assertIsNone(backup._end_time)
@@ -129,7 +134,8 @@ class TestBackup(unittest.TestCase):
 		self.assertTrue(isinstance(backup, klasse))
 		self.assertEqual(backup._instance, instance)
 		self.assertEqual(backup.backup_id, self.BACKUP_ID)
-		self.assertEqual(backup._table, "")
+		# self.assertEqual(backup._source_table, "")
+		self.assertIsNone(backup._source_table)
 		self.assertIsNone(backup._expire_time)
 		self.assertIsNone(backup._start_time)
 		self.assertIsNone(backup._end_time)
@@ -137,16 +143,19 @@ class TestBackup(unittest.TestCase):
 		self.assertIsNone(backup._state)
 
 	def test_property_name(self):
-		instance = _Instance(self.INSTANCE_NAME)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID,
+			_Instance(self.INSTANCE_NAME),
+			cluster=self.CLUSTER_ID
+		)
 		expected_name = self.BACKUP_NAME
 		self.assertEqual(backup.name, expected_name)
 
 	def test_property_table(self):
 		instance = _Instance(self.INSTANCE_NAME)
 		backup = self._make_one(self.BACKUP_ID, instance)
-		expected = backup._table = self.TABLE_NAME
-		self.assertEqual(backup.table, expected)
+		expected = backup._source_table = self.TABLE_NAME
+		self.assertEqual(backup.source_table, expected)
 
 	def test_property_expire_time(self):
 		instance = _Instance(self.INSTANCE_NAME)
@@ -186,14 +195,14 @@ class TestBackup(unittest.TestCase):
 		from google.cloud._helpers import _datetime_to_pb_timestamp
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.create_backup.side_effect = Unknown("testing")
 
 		timestamp = self._make_timestamp()
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME, client=client),
-			table=self.TABLE_NAME,
+			source_table=self.TABLE_NAME,
 			expire_time=timestamp
 		)
 
@@ -203,10 +212,10 @@ class TestBackup(unittest.TestCase):
 		}
 
 		with self.assertRaises(GoogleAPICallError):
-			backup.create()
+			backup.create(self.CLUSTER_ID)
 
 		api.create_backup.assert_called_once_with(
-			parent=self.INSTANCE_NAME,
+			parent=self.CLUSTER_NAME,
 			backup_id=self.BACKUP_ID,
 			backup=backup_pb,
 		)
@@ -216,14 +225,14 @@ class TestBackup(unittest.TestCase):
 		from google.cloud.exceptions import Conflict
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.create_backup.side_effect = Conflict("testing")
 
 		timestamp = self._make_timestamp()
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME, client=client),
-			table=self.TABLE_NAME,
+			source_table=self.TABLE_NAME,
 			expire_time=timestamp
 		)
 
@@ -233,10 +242,10 @@ class TestBackup(unittest.TestCase):
 		}
 
 		with self.assertRaises(Conflict):
-			backup.create()
+			backup.create(self.CLUSTER_ID)
 
 		api.create_backup.assert_called_once_with(
-			parent=self.INSTANCE_NAME,
+			parent=self.CLUSTER_NAME,
 			backup_id=self.BACKUP_ID,
 			backup=backup_pb,
 		)
@@ -246,14 +255,14 @@ class TestBackup(unittest.TestCase):
 		from google.cloud.exceptions import NotFound
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.create_backup.side_effect = NotFound("testing")
 
 		timestamp = self._make_timestamp()
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME, client=client),
-			table=self.TABLE_NAME,
+			source_table=self.TABLE_NAME,
 			expire_time=timestamp
 		)
 
@@ -263,10 +272,10 @@ class TestBackup(unittest.TestCase):
 		}
 
 		with self.assertRaises(NotFound):
-			backup.create()
+			backup.create(self.CLUSTER_ID)
 
 		api.create_backup.assert_called_once_with(
-			parent=self.INSTANCE_NAME,
+			parent=self.CLUSTER_NAME,
 			backup_id=self.BACKUP_ID,
 			backup=backup_pb,
 		)
@@ -275,11 +284,11 @@ class TestBackup(unittest.TestCase):
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME),
-			table=self.TABLE_NAME,
+			source_table=self.TABLE_NAME,
 		)
 
 		with self.assertRaises(ValueError):
-			backup.create()
+			backup.create(self.CLUSTER_ID)
 
 	def test_create_expire_time_not_set(self):
 		backup = self._make_one(
@@ -289,21 +298,21 @@ class TestBackup(unittest.TestCase):
 		)
 
 		with self.assertRaises(ValueError):
-			backup.create()
+			backup.create(self.CLUSTER_ID)
 
 	def test_create_success(self):
 		from google.cloud._helpers import _datetime_to_pb_timestamp
 
 		op_future = object()
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.create_backup.return_value = op_future
 
 		timestamp = self._make_timestamp()
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME, client=client),
-			table=self.TABLE_NAME,
+			source_table=self.TABLE_NAME,
 			expire_time=timestamp
 		)
 
@@ -312,11 +321,11 @@ class TestBackup(unittest.TestCase):
 			"expire_time": _datetime_to_pb_timestamp(timestamp),
 		}
 
-		future = backup.create()
+		future = backup.create(self.CLUSTER_ID)
 		self.assertIs(future, op_future)
 
 		api.create_backup.assert_called_once_with(
-			parent=self.INSTANCE_NAME,
+			parent=self.CLUSTER_NAME,
 			backup_id=self.BACKUP_ID,
 			backup=backup_pb,
 		)
@@ -325,11 +334,13 @@ class TestBackup(unittest.TestCase):
 		from google.api_core.exceptions import Unknown
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.get_backup.side_effect = Unknown("testing")
 
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 
 		with self.assertRaises(Unknown):
 			backup.exists()
@@ -340,11 +351,13 @@ class TestBackup(unittest.TestCase):
 		from google.api_core.exceptions import NotFound
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.get_backup.side_effect = NotFound("testing")
 
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 
 		self.assertFalse(backup.exists())
 
@@ -355,11 +368,13 @@ class TestBackup(unittest.TestCase):
 
 		client = _Client()
 		backup_pb = table_pb2.Backup(name=self.BACKUP_NAME)
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.get_backup.return_value = backup_pb
 
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 
 		self.assertTrue(backup.exists())
 
@@ -369,10 +384,12 @@ class TestBackup(unittest.TestCase):
 		from google.api_core.exceptions import Unknown
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.delete_backup.side_effect = Unknown("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 
 		with self.assertRaises(Unknown):
 			backup.delete()
@@ -383,10 +400,12 @@ class TestBackup(unittest.TestCase):
 		from google.api_core.exceptions import NotFound
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.delete_backup.side_effect = NotFound("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 
 		with self.assertRaises(NotFound):
 			backup.delete()
@@ -397,10 +416,12 @@ class TestBackup(unittest.TestCase):
 		from google.protobuf.empty_pb2 import Empty
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.delete_backup.return_value = Empty()
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 
 		backup.delete()
 
@@ -411,17 +432,19 @@ class TestBackup(unittest.TestCase):
 		from google.cloud._helpers import _datetime_to_pb_timestamp
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.update_backup.side_effect = Unknown("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 		expire_time = self._make_timestamp()
 
 		with self.assertRaises(Unknown):
 			backup.update_expire_time(expire_time)
 
 		backup_update = {
-			"source_table": self.TABLE_NAME,
+			"name": self.BACKUP_NAME,
 			"expire_time": _datetime_to_pb_timestamp(expire_time),
 		}
 		update_mask = {"paths": ["expire_time"]}
@@ -435,17 +458,19 @@ class TestBackup(unittest.TestCase):
 		from google.cloud._helpers import _datetime_to_pb_timestamp
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.update_backup.side_effect = NotFound("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 		expire_time = self._make_timestamp()
 
 		with self.assertRaises(NotFound):
 			backup.update_expire_time(expire_time)
 
 		backup_update = {
-			"source_table": self.TABLE_NAME,
+			"name": self.BACKUP_NAME,
 			"expire_time": _datetime_to_pb_timestamp(expire_time),
 		}
 		update_mask = {"paths": ["expire_time"]}
@@ -459,16 +484,18 @@ class TestBackup(unittest.TestCase):
 		from google.cloud.bigtable_admin_v2.proto import table_pb2
 
 		client = _Client()
-		api = client.table_admin_api = self._make_table_admin_api()
+		api = client.table_admin_client = self._make_table_admin_client()
 		api.update_backup.return_type = table_pb2.Backup(name=self.BACKUP_NAME)
 		instance = _Instance(self.INSTANCE_NAME, client=client)
-		backup = self._make_one(self.BACKUP_ID, instance)
+		backup = self._make_one(
+			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+		)
 		expire_time = self._make_timestamp()
 
 		backup.update_expire_time(expire_time)
 
 		backup_update = {
-			"source_table": self.TABLE_NAME,
+			"name": self.BACKUP_NAME,
 			"expire_time": _datetime_to_pb_timestamp(expire_time),
 		}
 		update_mask = {"paths": ["expire_time"]}

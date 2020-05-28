@@ -45,9 +45,13 @@ class Backup(object):
 	:type instance: :class:`~google.cloud.spanner_v1.instance.Instance`
 	:param instance: The Instance that owns the Backup.
 
-	:type table: str
-	:param table: (Optional) The ID of the Table that the Backup is for.
-				  Required if the 'create' method needs to be called.
+	:type cluster: str
+	:param cluster: (Optional) The ID of the Cluster that contains this Backup.
+					Required for calling 'delete', 'exists' etc. methods.
+
+	:type source_table: str
+	:param source_table: (Optional) The ID of the Table that the Backup is for.
+				  		 Required if the 'create' method needs to be called.
 
 	:type expire_time: :class:`datetime.datetime`
 	:param expire_time: (Optional) The expiration time that will be used to
@@ -55,10 +59,11 @@ class Backup(object):
 	                    needs to be called.
 	"""
 
-	def __init__(self, backup_id, instance, table=None, expire_time=None):
+	def __init__(self, backup_id, instance, cluster=None, source_table=None, expire_time=None):
 		self.backup_id = backup_id
 		self._instance = instance
-		self._table = table
+		self._cluster = cluster
+		self._source_table = source_table
 		self._expire_time = expire_time
 		self._start_time = None
 		self._end_time = None
@@ -67,19 +72,22 @@ class Backup(object):
 
 	@property
 	def name(self):
-		"""Backup name used in requests.
+		""" Backup name used in requests.
 
 		The Backup name is of the form
 
-			``"projects/../instances/../backups/{backup_id}"``
+			``"projects/../instances/../clusters/../backups/{backup_id}"``
 
 		:rtype: str
 		:returns: The Backup name.
 		"""
-		return self._instance.name + "/backups/" + self.backup_id
+		# return self._instance.name + "/backups/" + self.backup_id
+		return '{}/clusters/{}/backups/{}'.format(
+			self._instance.name, self._cluster, self.backup_id
+		)
 
 	@property
-	def table(self):
+	def source_table(self):
 		""" The name of the Table from which this Backup is created.
 
 		The table name is of the form
@@ -89,7 +97,7 @@ class Backup(object):
 		:rtype: str
 		:returns: The Table name.
 		"""
-		return self._table
+		return self._source_table
 
 	@property
 	def expire_time(self):
@@ -177,11 +185,14 @@ class Backup(object):
 		backup_id = match.group("backup_id")
 		return cls(backup_id, instance)
 
-	def _metadata(self):
-		return [("google-cloud-bigtable-backup", self.name)]
+	# def _metadata(self):
+	# 	return [("google-cloud-bigtable-backup", self.name)]
 
-	def create(self):
+	def create(self, cluster_id):
 		""" Creates this backup within its instance.
+
+		:type cluster_id: str
+		:param cluster_id: The ID of the Cluster for the newly created Backup.
 
 		:rtype: :class:`~google.api_core.operation.Operation`
 		:returns: :class:`~google.cloud.bigtable_admin_v2.types._OperationFuture`
@@ -193,20 +204,25 @@ class Backup(object):
 		"""
 		if not self._expire_time:
 			raise ValueError("expire_time not set")
-		if not self._table:
+		if not self._source_table:
 			raise ValueError("database not set")
 
+		self._cluster = cluster_id
+		parent = self._instance.name + '/clusters/' + self._cluster
+
 		backup = {
-			"table": self._table,
+			"source_table": self._source_table,
 			"expire_time": _datetime_to_pb_timestamp(self.expire_time),
 		}
 
 		api = self._instance._client.table_admin_client
 		future = api.create_backup(
-			self._instance.name,
+			# self._instance.name,
+			parent,
+			# self.name,
 			self.backup_id,
 			backup,
-			metadata=self._metadata
+			# metadata=self._metadata
 		)
 		return future
 
@@ -218,7 +234,8 @@ class Backup(object):
 		"""
 		try:
 			api = self._instance._client.table_admin_client
-			api.get_backup(self.name, metadata=self._metadata)
+			# api.get_backup(self.name, metadata=self._metadata)
+			api.get_backup(self.name)
 		except NotFound:
 			return False
 		return True
@@ -231,7 +248,8 @@ class Backup(object):
 		"""
 		try:
 			api = self._instance._client.table_admin_client
-			backup = api.get_backup(self.name, metadata=self._metadata)
+			# backup = api.get_backup(self.name, metadata=self._metadata)
+			backup = api.get_backup(self.name)
 		except NotFound:
 			return None
 		return backup
@@ -249,7 +267,9 @@ class Backup(object):
 		update_mask = {"paths": ["expire_time"]}
 		api = self._instance._client.table_admin_client
 		api.update_backup(
-			backup_update, update_mask, metadata=self._metadata
+			backup_update,
+			update_mask,
+			# metadata=self._metadata
 		)
 		self._expire_time = new_expire_time
 
@@ -263,12 +283,13 @@ class Backup(object):
 		:rtype: bool
 		:returns: True if the Backup state is READY, otherwise False.
 		"""
-		return self._state == enums
+		return self._state == enums.Backup.State.READY
 
 	def delete(self):
-		"""Delete this backup."""
+		""" Delete this Backup."""
 		api = self._instance._client.table_admin_client
-		api.delete_backup(self.name, metadata=self._metadata)
+		# api.delete_backup(self.name, metadata=self._metadata)
+		api.delete_backup(self.name)
 
 	def restore(self, table_id):
 		""" Creates a new Table by restoring from this Backup. The new Table
@@ -289,7 +310,7 @@ class Backup(object):
 			self._instance.name,
 			table_id,
 			self.backup_id,
-			metadata=self._metadata
+			# metadata=self._metadata
 		)
 		return future
 
