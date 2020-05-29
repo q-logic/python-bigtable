@@ -646,11 +646,15 @@ class Instance(object):
 
         return result
 
-    def backup(self, backup_id, table=None, expire_time=None):
+    def backup(self, backup_id, cluster=None, table=None, expire_time=None):
         """ Factory to create a Backup within this Instance.
 
         :type backup_id: str
         :param backup_id: The ID of the Backup to be created.
+
+        :type cluster: str
+        :param cluster: (Optional) The ID of the Cluster to contain the Backup.
+                        Required for calling 'delete', 'exists' etc. methods.
 
         :type table: :class:`~google.cloud.bigtable.table.Table`
         :param table: (Optional) The Table create the Backup from.
@@ -662,11 +666,15 @@ class Instance(object):
         """
         try:
             return backup.Backup(
-                backup_id, self, table=table.name, expire_time=expire_time
+                backup_id,
+                self,
+                cluster,
+                source_table=table.name,
+                expire_time=expire_time
             )
         except AttributeError:
             return backup.Backup(
-                backup_id, self, table=table, expire_time=expire_time
+                backup_id, self, source_table=table, expire_time=expire_time
             )
 
     def list_backups(self):
@@ -687,7 +695,9 @@ class Instance(object):
             backup_prefix = self.name + '/backups/'
             if not backup_pb.name.startswith(backup_prefix):
                 raise ValueError(
-                    "Backup name {} not of expected format".format(backup_pb.name)
+                    "Backup name '{}' has invalid format".format(
+                        backup_pb.name
+                    )
                 )
             backup_id = backup_pb.name[len(backup_prefix) :]
             result.append(self.backup(backup_id))

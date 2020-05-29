@@ -995,3 +995,16 @@ class TestInstance(unittest.TestCase):
 
         self.assertIsInstance(app_profile_2, AppProfile)
         self.assertEqual(app_profile_2.name, app_profile_name2)
+
+    def test_backup_factory_defaults(self):
+        raise NotImplementedError
+
+    def test_backup_factory_non_defaults(self):
+        raise NotImplementedError
+
+    def test_list_backups_defaults(self):
+        raise NotImplementedError
+
+    def test_list_backups_w_options(self):
+        raise NotImplementedError
+
