@@ -54,15 +54,16 @@ class Backup(object):
 				  		 Required if the 'create' method needs to be called.
 
 	:type expire_time: :class:`datetime.datetime`
-	:param expire_time: (Optional) The expiration time that will be used to
-	                    create the Backup. Required if the `create` method
-	                    needs to be called.
+	:param expire_time: (Optional) The expiration time after which the Backup
+						will be automatically deleted. Required if the `create`
+						method needs to be called.
 	"""
 
-	def __init__(self, backup_id, instance, cluster=None, source_table=None, expire_time=None):
+	def __init__(self, backup_id, instance,
+				 cluster_id=None, source_table=None, expire_time=None):
 		self.backup_id = backup_id
 		self._instance = instance
-		self._cluster = cluster
+		self._cluster = cluster_id
 		self._source_table = source_table
 		self._expire_time = expire_time
 		self._start_time = None
@@ -188,7 +189,23 @@ class Backup(object):
 	# def _metadata(self):
 	# 	return [("google-cloud-bigtable-backup", self.name)]
 
-	def create(self, cluster_id):
+	def _set_default_cluster(self):
+		""" A helper method for choosing a cluster automatically.
+
+		TODO: Determine whether this is necessary
+
+		The preference is given to the first cluster found in `READY` state.
+		Otherwise, the choice is given to th the first item in the list of
+		available clusters.
+		"""
+		clusters, _ = self._instance.list_clusters()
+		for cluster in clusters:
+			if cluster.atate == enums.Cluster.State.READY:
+				self._cluster = cluster.split('/')[-1]
+				return
+		self._cluster = clusters[0].split('/')[-1]
+
+	def create(self, cluster_id=None):
 		""" Creates this backup within its instance.
 
 		:type cluster_id: str
@@ -207,7 +224,10 @@ class Backup(object):
 		if not self._source_table:
 			raise ValueError("database not set")
 
-		self._cluster = cluster_id
+		if cluster_id:
+			self._cluster = cluster_id
+		elif not self._cluster:
+			self._set_default_cluster()
 		parent = self._instance.name + '/clusters/' + self._cluster
 
 		backup = {
