@@ -15,6 +15,8 @@
 """User friendly container for Cloud Bigtable Backup."""
 
 import re
+import warnings
+from datetime import datetime
 
 from google.cloud._helpers import _datetime_to_pb_timestamp
 from google.cloud.bigtable_admin_v2.gapic import enums
@@ -28,6 +30,7 @@ _BACKUP_NAME_RE = re.compile(
     r"clusters/(?P<cluster_id>[a-z][-a-z0-9]*)/"
     r"backups/(?P<backup_id>[a-z][a-z0-9_\-]*[a-z0-9])$"
 )
+_DEFAULT_EXPIRE_PERIOD = 604800 # 7 days
 
 
 class Backup(object):
@@ -45,8 +48,8 @@ class Backup(object):
 	:type instance: :class:`~google.cloud.spanner_v1.instance.Instance`
 	:param instance: The Instance that owns the Backup.
 
-	:type cluster: str
-	:param cluster: (Optional) The ID of the Cluster that contains this Backup.
+	:type cluster_id: str
+	:param cluster_id: (Optional) The ID of the Cluster that contains this Backup.
 					Required for calling 'delete', 'exists' etc. methods.
 
 	:type source_table: str
@@ -205,6 +208,10 @@ class Backup(object):
 				return
 		self._cluster = clusters[0].split('/')[-1]
 
+	def _set_default_expire_time(self):
+		expire_timestamp = datetime.now().timestamp() + _DEFAULT_EXPIRE_PERIOD
+		self._expire_time = datetime.fromtimestamp(expire_timestamp)
+
 	def create(self, cluster_id=None):
 		""" Creates this backup within its instance.
 
@@ -220,9 +227,13 @@ class Backup(object):
 							or `expire_time` is not set
 		"""
 		if not self._expire_time:
-			raise ValueError("expire_time not set")
+			# raise ValueError('expire_time not set')
+			warnings.warn(
+				'expire_time parameter not set. Using default value instead.'
+			)
+			self._set_default_expire_time()
 		if not self._source_table:
-			raise ValueError("database not set")
+			raise ValueError("table not set")
 
 		if cluster_id:
 			self._cluster = cluster_id
