@@ -39,6 +39,8 @@ class TestInstance(unittest.TestCase):
     )
     TABLE_ID = "table_id"
     TABLE_NAME = INSTANCE_NAME + "/tables/" + TABLE_ID
+    CLUSTER_ID = 'cluster-id'
+    BACKUP_ID = "backup-id"
 
     @staticmethod
     def _get_target_class():
@@ -997,14 +999,149 @@ class TestInstance(unittest.TestCase):
         self.assertEqual(app_profile_2.name, app_profile_name2)
 
     def test_backup_factory_defaults(self):
-        raise NotImplementedError
+        from google.cloud.bigtable.backup import Backup
+
+        instance = self._make_one(self.INSTANCE_ID, None)
+        backup = instance.backup(self.BACKUP_ID)
+
+        self.assertIsInstance(backup, Backup)
+        self.assertEqual(backup.backup_id, self.BACKUP_ID)
+        self.assertIs(backup._instance, instance)
+
+        self.assertIsNone(backup._cluster)
+        self.assertIsNone(backup._source_table)
+        self.assertIsNone(backup._expire_time)
+        self.assertIsNone(backup._start_time)
+        self.assertIsNone(backup._end_time)
+        self.assertIsNone(backup._size_bytes)
+        self.assertIsNone(backup._state)
 
     def test_backup_factory_non_defaults(self):
-        raise NotImplementedError
+        import datetime
+        from google.cloud._helpers import UTC
+        from google.cloud.bigtable.backup import Backup
+
+        instance = self._make_one(self.INSTANCE_ID, None)
+        timestamp = datetime.datetime.utcnow().replace(tzinfo=UTC)
+        backup = instance.backup(
+            self.BACKUP_ID,
+            cluster_id=self.CLUSTER_ID,
+            table=self.TABLE_ID,
+            expire_time=timestamp
+        )
+
+        self.assertIsInstance(backup, Backup)
+        self.assertEqual(backup.backup_id, self.BACKUP_ID)
+        self.assertIs(backup._instance, instance)
+
+        self.assertEqual(backup.backup_id, self.BACKUP_ID)
+        self.assertIs(backup._cluster, self.CLUSTER_ID)
+        self.assertEqual(backup._source_table, self.TABLE_ID)
+        self.assertEqual(backup._expire_time, timestamp)
+        self.assertIsNone(backup._start_time)
+        self.assertIsNone(backup._end_time)
+        self.assertIsNone(backup._size_bytes)
+        self.assertIsNone(backup._state)
 
     def test_list_backups_defaults(self):
-        raise NotImplementedError
+        from google.cloud.bigtable_admin_v2.gapic import bigtable_instance_admin_client
+        from google.cloud.bigtable_admin_v2.gapic import bigtable_table_admin_client
+        from google.cloud.bigtable_admin_v2.proto import bigtable_table_admin_pb2
+        from google.cloud.bigtable_admin_v2.proto import table_pb2
+        from google.cloud.bigtable.backup import Backup
+
+        instance_admin_client = \
+            bigtable_instance_admin_client.BigtableInstanceAdminClient
+        table_admin_client = \
+            bigtable_table_admin_client.BigtableTableAdminClient(mock.Mock())
+        client = _Client(self.PROJECT)
+        client.table_admin_client = table_admin_client
+        client.instance_admin_client = instance_admin_client
+        instance = self._make_one(self.INSTANCE_ID, client)
+
+        backups_pb = bigtable_table_admin_pb2.ListBackupsResponse(
+            backups=[
+                table_pb2.Backup(name=self.INSTANCE_NAME + "/backups/op1"),
+                table_pb2.Backup(name=self.INSTANCE_NAME + "/backups/op2"),
+                table_pb2.Backup(name=self.INSTANCE_NAME + "/backups/op3"),
+            ]
+        )
+
+        api = table_admin_client._inner_api_calls["list_backups"] = mock.Mock(
+            return_value=backups_pb
+        )
+
+        backups = instance.list_backups()
+
+        for backup in backups:
+            self.assertIsInstance(backup, Backup)
+
+        expected_metadata = [
+            ("x-goog-request-params", "parent={}".format(instance.name)),
+        ]
+        api.assert_called_once_with(
+            bigtable_table_admin_pb2.ListBackupsRequest(
+                parent=self.INSTANCE_NAME
+            ),
+            retry=mock.ANY,
+            timeout=mock.ANY,
+            metadata=expected_metadata,
+        )
 
     def test_list_backups_w_options(self):
-        raise NotImplementedError
+        from google.cloud.bigtable_admin_v2.gapic import bigtable_instance_admin_client
+        from google.cloud.bigtable_admin_v2.gapic import bigtable_table_admin_client
+        from google.cloud.bigtable_admin_v2.proto import bigtable_table_admin_pb2
+        from google.cloud.bigtable_admin_v2.proto import table_pb2
+        from google.cloud.bigtable.backup import Backup
 
+        instance_admin_client = \
+            bigtable_instance_admin_client.BigtableInstanceAdminClient
+        table_admin_client = \
+            bigtable_table_admin_client.BigtableTableAdminClient(mock.Mock())
+        client = _Client(self.PROJECT)
+        client.table_admin_client = table_admin_client
+        client.instance_admin_client = instance_admin_client
+        instance = self._make_one(self.INSTANCE_ID, client)
+
+        backups_pb = bigtable_table_admin_pb2.ListBackupsResponse(
+            backups=[
+                table_pb2.Backup(name=self.INSTANCE_NAME + "/backups/op1"),
+                table_pb2.Backup(name=self.INSTANCE_NAME + "/backups/op2"),
+                table_pb2.Backup(name=self.INSTANCE_NAME + "/backups/op3"),
+            ]
+        )
+
+        api = table_admin_client._inner_api_calls["list_backups"] = mock.Mock(
+            return_value=backups_pb
+        )
+
+        backups = instance.list_backups(
+            filter_='filter',
+            order_by='order_by',
+            page_size=10
+        )
+
+        for backup in backups:
+            self.assertIsInstance(backup, Backup)
+
+        expected_metadata = [
+            ("x-goog-request-params", "parent={}".format(instance.name)),
+        ]
+        api.assert_called_once_with(
+            bigtable_table_admin_pb2.ListBackupsRequest(
+                parent=self.INSTANCE_NAME,
+                filter='filter',
+                order_by='order_by',
+                page_size=10
+            ),
+            retry=mock.ANY,
+            timeout=mock.ANY,
+            metadata=expected_metadata,
+        )
+
+
+class _Client(object):
+    def __init__(self, project=TestInstance.PROJECT):
+        self.project = project
+        self.project_name = "projects/" + self.project

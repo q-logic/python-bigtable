@@ -71,7 +71,7 @@ class TestBackup(unittest.TestCase):
 		backup = self._make_one(
 			self.BACKUP_ID,
 			instance,
-			cluster=self.CLUSTER_ID,
+			cluster_id=self.CLUSTER_ID,
 			source_table=self.TABLE_ID,
 			expire_time=expire_time
 		)
@@ -146,7 +146,7 @@ class TestBackup(unittest.TestCase):
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME),
-			cluster=self.CLUSTER_ID
+			cluster_id=self.CLUSTER_ID
 		)
 		expected_name = self.BACKUP_NAME
 		self.assertEqual(backup.name, expected_name)
@@ -284,7 +284,7 @@ class TestBackup(unittest.TestCase):
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME),
-			source_table=self.TABLE_NAME,
+			expire_time=self._make_timestamp()
 		)
 
 		with self.assertRaises(ValueError):
@@ -294,7 +294,7 @@ class TestBackup(unittest.TestCase):
 		backup = self._make_one(
 			self.BACKUP_ID,
 			_Instance(self.INSTANCE_NAME),
-			expire_time=self._make_timestamp()
+			source_table = self.TABLE_NAME,
 		)
 
 		with self.assertRaises(ValueError):
@@ -339,7 +339,7 @@ class TestBackup(unittest.TestCase):
 
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 
 		with self.assertRaises(Unknown):
@@ -356,7 +356,7 @@ class TestBackup(unittest.TestCase):
 
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 
 		self.assertFalse(backup.exists())
@@ -373,7 +373,7 @@ class TestBackup(unittest.TestCase):
 
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 
 		self.assertTrue(backup.exists())
@@ -388,7 +388,7 @@ class TestBackup(unittest.TestCase):
 		api.delete_backup.side_effect = Unknown("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 
 		with self.assertRaises(Unknown):
@@ -404,7 +404,7 @@ class TestBackup(unittest.TestCase):
 		api.delete_backup.side_effect = NotFound("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 
 		with self.assertRaises(NotFound):
@@ -420,7 +420,7 @@ class TestBackup(unittest.TestCase):
 		api.delete_backup.return_value = Empty()
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 
 		backup.delete()
@@ -436,7 +436,7 @@ class TestBackup(unittest.TestCase):
 		api.update_backup.side_effect = Unknown("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 		expire_time = self._make_timestamp()
 
@@ -462,7 +462,7 @@ class TestBackup(unittest.TestCase):
 		api.update_backup.side_effect = NotFound("testing")
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 		expire_time = self._make_timestamp()
 
@@ -488,7 +488,7 @@ class TestBackup(unittest.TestCase):
 		api.update_backup.return_type = table_pb2.Backup(name=self.BACKUP_NAME)
 		instance = _Instance(self.INSTANCE_NAME, client=client)
 		backup = self._make_one(
-			self.BACKUP_ID, instance, cluster=self.CLUSTER_ID
+			self.BACKUP_ID, instance, cluster_id=self.CLUSTER_ID
 		)
 		expire_time = self._make_timestamp()
 

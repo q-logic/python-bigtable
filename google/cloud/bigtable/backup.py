@@ -227,11 +227,11 @@ class Backup(object):
 							or `expire_time` is not set
 		"""
 		if not self._expire_time:
-			# raise ValueError('expire_time not set')
-			warnings.warn(
-				'expire_time parameter not set. Using default value instead.'
-			)
-			self._set_default_expire_time()
+			raise ValueError('expire_time not set')
+			# warnings.warn(
+			# 	'expire_time parameter not set. Using default value instead.'
+			# )
+			# self._set_default_expire_time()
 		if not self._source_table:
 			raise ValueError("table not set")
 
