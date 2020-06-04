@@ -388,6 +388,7 @@ class TestCluster(unittest.TestCase):
         self.assertEqual(result.operation.name, self.OP_NAME)
         self.assertIsInstance(result.metadata, messages_v2_pb2.CreateClusterMetadata)
 
+    @unittest.skip
     def test_update(self):
         import datetime
         from google.api_core import operation
