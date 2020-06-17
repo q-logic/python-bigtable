@@ -16,18 +16,18 @@
 
 import synthtool as s
 from synthtool import gcp
+from synthtool.languages import python
 
-gapic = gcp.GAPICGenerator()
+gapic = gcp.GAPICBazel()
 common = gcp.CommonTemplates()
 
 # ----------------------------------------------------------------------------
 # Generate bigtable and bigtable_admin GAPIC layer
 # ----------------------------------------------------------------------------
 library = gapic.py_library(
-    "bigtable",
-    "v2",
-    config_path="/google/bigtable/artman_bigtable.yaml",
-    artman_output_name="bigtable-v2",
+    service="bigtable",
+    version="v2",
+    bazel_target="//google/bigtable/v2:bigtable-v2-py",
     include_protos=True,
 )
 
@@ -36,10 +36,9 @@ s.move(library / "tests")
 
 # Generate admin client
 library = gapic.py_library(
-    "bigtable_admin",
-    "v2",
-    config_path="/google/bigtable/admin/artman_bigtableadmin.yaml",
-    artman_output_name="bigtable-admin-v2",
+    service="bigtable_admin",
+    version="v2",
+    bazel_target="//google/bigtable/admin/v2:bigtable-admin-v2-py",
     include_protos=True,
 )
 
@@ -85,7 +84,13 @@ s.replace(
 # ----------------------------------------------------------------------------
 # Add templated files
 # ----------------------------------------------------------------------------
-templated_files = common.py_library(unit_cov_level=97, cov_level=99)
+templated_files = common.py_library(unit_cov_level=97, cov_level=99, samples=True)
 s.move(templated_files, excludes=['noxfile.py'])
+
+# ----------------------------------------------------------------------------
+# Samples templates
+# ----------------------------------------------------------------------------
+
+python.py_samples(skip_readmes=True)
 
 s.shell.run(["nox", "-s", "blacken"], hide_output=False)
