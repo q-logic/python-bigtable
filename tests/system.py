@@ -671,6 +671,13 @@ class TestTableAdminAPI(unittest.TestCase):
         if Config.IN_EMULATOR:
             self.skipTest(message)
 
+    def _skip_if_emulated(self, message):
+        # NOTE: This method is necessary because ``Config.IN_EMULATOR``
+        #       is set at runtime rather than import time, which means we
+        #       can't use the @unittest.skipIf decorator.
+        if Config.IN_EMULATOR:
+            self.skipTest(message)
+
     def test_list_tables(self):
         # Since `Config.INSTANCE_DATA` is newly created in `setUpModule`, the
         # table created in `setUpClass` here will be the only one.
